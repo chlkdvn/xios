@@ -1,0 +1,23 @@
+# Rust build artifacts
+target/
+bootloader/target/
+xi/target/
+
+# Build/test outputs (disk images, rsync rootfs, temp install media)
+bootloader/dist/
+bootloader/dist/test/work/
+bootloader/dist/test/fresh/
+*.img
+*.iso
+*.qcow2
+*.efi
+*.efivar
+
+# Third-party tooling clone (github.com/latent-spaces/brag) + its rendered output
+/brag/
+/brag-output/
+
+# Editor / OS noise
+*.swp
+.DS_Store
+flycheck*

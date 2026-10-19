@@ -1,0 +1,3 @@
+# xi boot manager builds for the UEFI target (dropped into the ESP by mkimage.sh).
+[build]
+target = "x86_64-unknown-uefi"

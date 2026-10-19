@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>xi — XiOS panel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#0b0e12; --fg:#b8c0c8; --hi:#e9eef3; --dim:#5c646e;
+    --grn:#3fd68a; --amb:#d9a05b; --red:#e06c75; --ink:#131820;
+    --line:#242b34;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{color-scheme:dark}
+  body{
+    background:var(--bg); color:var(--fg);
+    font:13px/1.5 ui-monospace,"JetBrains Mono","Fira Code",Menlo,Consolas,"Liberation Mono",monospace;
+    padding:26px 30px 120px; max-width:1180px; margin:0 auto;
+  }
+  ::selection{background:var(--grn);color:var(--bg)}
+  a{color:var(--grn);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* ── header: neofetch layout ── */
+  .top{display:grid;grid-template-columns:290px 1fr;gap:34px;align-items:start;margin-bottom:8px}
+  pre.logo{color:var(--grn);line-height:1.25;font-size:14px;white-space:pre}
+  .label{color:var(--grn)}
+  .info div{display:flex;gap:0}
+  .info .k{display:inline-block;min-width:9ch;color:var(--grn)}
+  .cursor{display:inline-block;color:var(--grn);animation:blink 1.1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  .rule{color:var(--dim);white-space:nowrap;overflow:hidden;margin:20px 0 10px;font-size:12px;letter-spacing:0}
+  .rule::before{content:"── "} .rule::after{content:" ───────────────────────────────────────────────────────────"}
+
+  /* ── status strip ── */
+  .strip{color:var(--fg)}
+  .strip b{color:var(--hi);font-weight:600}
+
+  /* ── slot table ── */
+  table{border-collapse:collapse;width:100%;white-space:nowrap}
+  th{color:var(--dim);font-weight:400;text-align:left;font-size:12px;
+     border-bottom:1px solid var(--line);padding:4px 1.5ch 5px 0}
+  td{padding:5px 1.5ch 5px 0;border-bottom:1px solid var(--line);color:var(--fg)}
+  .nm{color:var(--hi);font-weight:600}
+  .on{color:var(--grn)} .off{color:var(--dim)}
+  .iso{color:var(--dim);max-width:44ch;overflow:hidden;text-overflow:ellipsis}
+  .act{padding-right:0 !important;text-align:right;white-space:nowrap}
+  .usb td{border-bottom:0;color:var(--amb)}
+  tr:first-child td, tr:first-child th{padding-top:2px}
+
+  /* ── TUI buttons (text actions) ── */
+  button{cursor:pointer;font:inherit;background:none;border:0;color:var(--grn);padding:0 0 0 .5ch}
+  button::before{content:"["} button::after{content:"]"}
+  button:hover{color:var(--hi);text-decoration:underline}
+  button.dn{color:var(--red)} button.dn:hover{color:var(--red);text-decoration:underline}
+  button:disabled{color:var(--dim);cursor:not-allowed;text-decoration:none}
+  button.pri{margin:0 0 0 .5ch}
+
+  /* ── forms: tui prompt style ── */
+  form{border:1px dashed var(--line);padding:14px 16px 16px;margin-top:4px}
+  .fld{display:flex;align-items:baseline;gap:1ch;margin-bottom:8px}
+  .fld label{color:var(--grn);min-width:11ch;text-align:right}
+  .fld label::after{content:">"}
+  input,select{font:inherit;color:var(--hi);background:var(--ink);
+    border:1px solid var(--line);padding:4px 8px;min-width:30ch}
+  input:focus,select:focus{outline:none;border-color:var(--grn)}
+  .row3{display:flex;gap:14px}
+  .row3 .fld{margin-bottom:0}
+  .row3 input{min-width:9ch}
+  sub{color:var(--dim);font-size:11px;display:block;margin:2px 0 10px;padding-left:12ch}
+  form .go{display:flex;align-items:center;gap:10px}
+
+  /* ── store lines ── */
+  .store{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding:5px 0}
+  .store .s{color:var(--hi)} .store .n{color:var(--dim)}
+
+  /* ── progress bar (blocky) ── */
+  .prog{color:var(--grn);margin-top:10px;display:none;font-weight:600}
+  .prog i{font-style:normal}
+
+  /* ── toast strip ── */
+  .toast{position:fixed;left:0;right:0;bottom:0;background:var(--ink);
+    border-top:1px solid var(--grn);color:var(--fg);padding:10px 30px;
+    display:none;white-space:pre}
+  .toast.err{border-top-color:var(--red);color:var(--red)}
+
+  @media (max-width:860px){
+    .top{grid-template-columns:1fr}
+    pre.logo{display:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="top">
+<pre class="logo">╭──────────────╮
+│              │
+│    x  i      │
+│              │
+╰──────────────╯
+  xi · xios 0.1.0
+  one machine,
+  many systems</pre>
+<div class="info" id="hdr"><span class="label">xi@xios</span><span class="cursor">▌</span></div>
+</div>
+
+<div class="rule">host</div>
+<div class="strip" id="stats">probing host…</div>
+
+<div class="rule">slot machines <span id="slotct"></span></div>
+<div id="usbbar"></div>
+<table id="slots"><tr><td class="dim">linking registry…</td></tr></table>
+
+<div class="rule">add slot</div>
+<form id="addF" onsubmit="return addSlot(event)">
+  <div class="fld"><label>name</label><input id="f-name" placeholder="linux-mint" required></div>
+  <div class="fld"><label>iso</label><select id="f-iso"></select></div>
+  <sub>from your ISO library — fetch more in the store below</sub>
+  <div class="row3">
+    <div class="fld"><label>cpu</label><input id="f-cpu" type="number" min="1" value="2"></div>
+    <div class="fld"><label>ram-mib</label><input id="f-ram" type="number" min="256" value="4096"></div>
+    <div class="fld"><label>disk-gib</label><input id="f-disk" type="number" min="1" value="32"></div>
+  </div>
+  <div class="go" style="margin-top:12px">
+    <button type="submit" class="pri">register slot</button>
+    <sub id="f-msg" style="display:inline;padding:0;color:var(--dim)">[enter] commits</sub>
+  </div>
+</form>
+
+<div class="rule">xi store — iso library</div>
+<div id="store"></div>
+<form id="dlF" onsubmit="return dlCustom(event)" style="margin-top:14px">
+  <div class="fld"><label>fetch-url</label><input id="dl-url" placeholder="https://…/my-installer.iso" required></div>
+  <div class="go"><button type="submit" class="pri">download</button><sub id="dl-msg" style="padding:0;color:var(--dim)">https only</sub></div>
+  <div class="prog" id="dl-prog"><i></i></div>
+</form>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CAT = [
+  {label:"Alpine Linux (virt)", size:"66 MB", url:"https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-virt-3.24.2-x86_64.iso",
+   sha:"3ab424762af704b2c2a9e57df1dc37f982af260071504d977f2fb96822e7130b", note:"tiny · fast starter"},
+  {label:"Tiny Core Linux", size:"26 MB", url:"https://tinycorelinux.net/16.x/x86_64/release/CorePure64-16.0.iso",
+   sha:"", note:"runs in ~15 MB RAM"},
+  {label:"Debian 12 netinst", size:"660 MB", url:"https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.11.0-amd64-netinst.iso",
+   sha:"", note:"full base system"},
+];
+
+const $ = s => document.querySelector(s);
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+/* quiet polling: re-render only when state changed; job progress quantized
+   to 5% buckets so active downloads don't thrash the DOM. */
+let lastSig = "";
+function sig(j){
+  return JSON.stringify([
+    j.host, j.slots, j.isos, j.usb,
+    (j.jobs || []).map(x => [x.id, Math.round(x.frac / 5) * 5])
+  ]);
+}
+
+async function api(path, body){
+  const opt = body ? {method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body} : {};
+  return (await fetch(path, opt)).text();
+}
+
+function toast(msg, err){
+  const t = $("#toast");
+  t.textContent = "> " + msg;
+  t.classList.toggle("err", !!err);
+  t.style.display = "block";
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.style.display = "none", 3000);
+}
+
+function header(h){
+  $("#hdr").innerHTML =
+    `<span class="label">xi@xios</span>` +
+    ` ─ one machine, many systems` +
+    `<div><span class="k">os</span>    ${esc("xios 0.1.0 · panel")}</div>` +
+    `<div><span class="k">cores</span> ${h.cores}</div>` +
+    `<div><span class="k">mem</span>   ${GB(h.mem)} gib</div>` +
+    `<div><span class="k">disk</span>  ${h.free} gib free</div>` +
+    `<div><span class="k">slots</span> ${h.slots}/${h.max} active</div>` +
+    `<div><span class="k">vm</span>    kvm ready</div>` +
+    `<div><span class="label"><br></span><span class="cursor">▌</span></div>`;
+}
+const GB = m => (m/1024).toFixed(1);
+const fmtSz = b => b>1e9 ? (b/1e9).toFixed(1)+" GB" : (b/1e6).toFixed(0)+" MB";
+
+function slotRow(s){
+  const dot = s.running ? `<span class="on">● run</span>` : `<span class="off">· off</span>`;
+  const act = s.running
+    ? `<button class="dn" onclick="slotAct('stop','${s.name}')">stop</button>`
+    : `<button onclick="slotAct('run','${s.name}')">run</button>` +
+      `<button class="dn" onclick="slotAct('rm','${s.name}')">rm</button>`;
+  return `<tr>
+    <td class="nm">${esc(s.name)}</td>
+    <td>${s.cpu}</td><td>${s.ram}</td><td>${s.disk}</td>
+    <td>${dot}</td>
+    <td class="iso" title="${esc(s.iso)}">${esc(s.iso || "—")}</td>
+    <td class="act">${act}</td></tr>`;
+}
+
+async function refresh(){
+  try{
+    const j = JSON.parse(await fetch("/api/state").then(r=>r.text()));
+    const s = sig(j);
+    if (s === lastSig) return;          // nothing changed → zero DOM writes
+    lastSig = s;
+    header(j.host);
+
+    $("#stats").innerHTML =
+      `core <b>${j.host.cores}</b> &nbsp;·&nbsp; ram <b>${GB(j.host.mem)} GiB</b>` +
+      ` &nbsp;·&nbsp; disk <b>${j.host.free} GiB</b> free` +
+      ` &nbsp;·&nbsp; slots <b>${j.host.slots}/${j.host.max}</b>`;
+    $("#slotct").textContent = `· ${j.host.slots}/${j.host.max}`;
+
+    $("#usbbar").innerHTML = (j.usb||[]).length ?
+      `<table><tr class="usb"><td class="nm">! usb</td>` +
+      `<td colspan="5">install stick mounted: <b>${esc(j.usb[0].path.split("/").pop())}</b> (${fmtSz(j.usb[0].size)})</td>` +
+      `<td class="act"><button onclick="usbInstall('${esc(j.usb[0].path)}')">install</button></td></tr></table>` : "";
+
+    $("#slots").innerHTML =
+      `<tr><th>slot</th><th>cpu</th><th>ram mib</th><th>disk gib</th><th>state</th><th>installer iso</th><th>actions</th></tr>` +
+      (j.slots.length ? j.slots.map(slotRow).join("")
+                      : `<tr><td colspan="7" class="off">no slots yet — register your first below</td></tr>`);
+
+    const sel = $("#f-iso");
+    const keep = sel.value;
+    sel.innerHTML = j.isos.map(i =>
+      `<option value="${esc(i.path)}">${esc(i.path.split("/").pop())} · ${fmtSz(i.size)}</option>`).join("")
+      || `<option value="">— library empty: grab one below —</option>`;
+    if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
+
+    $("#store").innerHTML = CAT.map(c =>
+      `<div class="store"><div><span class="s">${c.label}</span>` +
+      `<span class="n"> — ${c.size} · ${c.note}</span></div>` +
+      `<button onclick="dl('${c.url}','${c.sha}')">get</button></div>`).join("");
+
+    const jobs = j.jobs || [];
+    const alive = jobs.filter(x => x.frac < 100);
+    if (alive.length){
+      const f = Math.min(alive[0].frac, 100);
+      const blocks = Math.round(f / 5);
+      $("#dl-prog").style.display = "block";
+      $("#dl-prog i").textContent =
+        "▓".repeat(blocks) + "░".repeat(20 - blocks) + ` ${f}%  ${esc(alive[0].file.split("/").pop())}`;
+      $("#dl-msg").textContent = "fetching · " + f + "%";
+    } else if (jobs.length){
+      $("#dl-prog").style.display = "block";
+      $("#dl-prog i").textContent = "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ done";
+      $("#dl-msg").textContent = "saved to ~/.xios/isos";
+    } else {
+      $("#dl-prog").style.display = "none";
+      $("#dl-msg").textContent = "https only";
+    }
+  } catch(e){ if (e && e.message) console.warn(e); }
+}
+
+async function addSlot(e){
+  e.preventDefault();
+  const name = $("#f-name").value.trim();
+  const iso  = $("#f-iso").value;
+  if (!iso){ toast("library empty — download an ISO from the store first", 1); return false; }
+  const q = new URLSearchParams({name, iso,
+    cpu:$("#f-cpu").value, ram:$("#f-ram").value, disk:$("#f-disk").value});
+  const res = await api("/api/slot/add", q.toString());
+  if (res === "ok"){ toast(`slot '${name}' registered`); $("#f-name").value = ""; }
+  else toast(res, 1);
+  refresh();
+  return false;
+}
+
+async function dl(url, sha){
+  toast("fetch started — progress below");
+  await api("/api/store/dl", new URLSearchParams({url, sha256: sha||""}).toString());
+  setTimeout(refresh, 900);
+}
+function dlCustom(e){ e.preventDefault(); dl($("#dl-url").value.trim(), ""); return false; }
+
+async function slotAct(action, name){
+  if (action === "run") toast("booting " + name + " — vm window opening");
+  if (action === "rm" && !confirm("remove slot '"+name+"'? (disk image & files stay)")) return;
+  await api("/api/slot/"+action, new URLSearchParams({name}).toString());
+  refresh();
+}
+
+async function usbInstall(isoPath){
+  const guess = isoPath.split("/").pop().replace(/\.iso$/i,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,28);
+  $("#f-name").value = guess;
+  const sel = $("#f-iso");
+  if (![...sel.options].some(o => o.value === isoPath)){
+    const opt = document.createElement("option");
+    opt.value = isoPath; opt.textContent = "usb: " + isoPath.split("/").pop();
+    sel.appendChild(opt);
+  }
+  sel.value = isoPath;
+  $("#f-name").focus();
+  toast("set cpu/ram budget, then [register slot]");
+}
+
+refresh();
+let poll = setInterval(refresh, 2500);
+document.addEventListener("visibilitychange", () => {
+  clearInterval(poll);
+  if (!document.hidden){ refresh(); poll = setInterval(refresh, 2500); }
+});
+</script>
+</body>
+</html>
