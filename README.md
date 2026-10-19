@@ -16,6 +16,16 @@ Android — same files. Like Docker volumes, but for whole operating systems.
 
 **Mental model: XiOS is to laptops what Docker is to servers.**
 
+## The launch video
+
+[![XiOS launch video](docs/brag/brag.jpg)](https://github.com/chlkdvn/xios/raw/main/docs/brag/brag.mp4)
+
+_*(click the image to watch `docs/brag/brag.mp4` — ~4 MB)*_
+
+> **XiOS: one machine, many systems.** Five OS slots with their own CPU/RAM/disk,
+> their own UEFI boot manager, and a web panel that looks like neofetch.
+> It boots. It runs. It is yours.
+
 ---
 
 ## What's in this repo
